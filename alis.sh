@@ -563,9 +563,10 @@ function partition() {
 
     # luks and lvm
     if [ -n "$LUKS_PASSWORD" ]; then
-        echo -n "$LUKS_PASSWORD" | cryptsetup --key-size=512 --key-file=- luksFormat --type luks2 $PARTITION_ROOT
-        echo -n "$LUKS_PASSWORD" | cryptsetup --key-file=- open $PARTITION_ROOT $LUKS_DEVICE_NAME
-        sleep 5
+        echo -n "$LUKS_PASSWORD" | cryptsetup --key-size=512 luksFormat --type luks2 --pbkdf argon2id -i 5000 $PARTITION_ROOT
+        echo -n "$LUKS_PASSWORD" | cryptsetup open $PARTITION_ROOT $LUKS_DEVICE_NAME
+        sleep 13
+        # TODO: keyfile generation to avoid having to enter the encryption passphrase twice (once for GRUB and once more for initramfs.)
     fi
 
     if [ "$LVM" == "true" ]; then
@@ -1030,6 +1031,17 @@ function display_driver() {
     if [ "$PACKAGES_MULTILIB" == "true" ]; then
         pacman_install "$PACKAGES_DRIVER_MULTILIB $PACKAGES_VULKAN_MULTILIB $PACKAGES_HARDWARE_ACCELERATION_MULTILIB"
     fi
+
+    if [ "$DISPLAY_DRIVER" == "nvidia" ]; then
+        # Auto rebuild pacman hook
+        mkdir -p /mnt/etc/pacman.d/hooks
+        touch /mnt/etc/pacman.d/hooks/nvidia.hook
+        echo -e "[Trigger]\nOperation=Install\nOperation=Upgrade\nOperation=Remove\nType=Package\nTarget=nvidia\nTarget=linux\n# Change the linux part above and in the Exec line if a different kernel is used\n[Action]\nDescription=Update Nvidia module in initcpio\nDepends=mkinitcpio\nWhen=PostTransaction\nNeedsTargets\nExec=/bin/sh -c 'while read -r trg; do case \$trg in linux) exit 0; esac; done; /usr/bin/mkinitcpio -P'\n" >> /mnt/etc/pacman.d/hooks/nvidia.hook
+        # Hardware accelerated video encoding with NVENC
+        mkdir -p /mnt/etc/udev/rules.d
+        touch /mnt/etc/udev/rules.d/70-nvidia.rules
+        echo -e 'ACTION=="add", DEVPATH=="/bus/pci/drivers/nvidia", RUN+="/usr/bin/nvidia-modprobe -c0 -u"' >> /mnt/etc/udev/rules.d/70-nvidia.rules
+    fi
 }
 
 function kernels() {
@@ -1225,6 +1237,7 @@ function bootloader() {
     fi
     if [ "$FILE_SYSTEM_TYPE" == "btrfs" ]; then
         CMDLINE_LINUX="$CMDLINE_LINUX rootflags=subvol=root"
+        arch-chroot /mnt sed -i 's|'BINARIES=\(\)'|BINARIES=\(/usr/bin/btrfs\)|g' /etc/mkinitcpio.conf
     fi
     if [ "$KMS" == "true" ]; then
         case "$DISPLAY_DRIVER" in
@@ -1256,19 +1269,35 @@ function bootloader() {
 }
 
 function bootloader_grub() {
-    pacman_install "grub dosfstools"
+    
+    pacman_install "grub efibootmgr dosfstools os-prober"
+    
     arch-chroot /mnt sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT=saved/' /etc/default/grub
     arch-chroot /mnt sed -i 's/#GRUB_SAVEDEFAULT="true"/GRUB_SAVEDEFAULT="true"/' /etc/default/grub
     arch-chroot /mnt sed -i -E 's/GRUB_CMDLINE_LINUX_DEFAULT="(.*) quiet"/GRUB_CMDLINE_LINUX_DEFAULT="\1"/' /etc/default/grub
-    arch-chroot /mnt sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"/' /etc/default/grub
+
     echo "" >> /mnt/etc/default/grub
-    echo "# alis" >> /mnt/etc/default/grub
+    echo "# Custom flags" >> /mnt/etc/default/grub
     echo "GRUB_DISABLE_SUBMENU=y" >> /mnt/etc/default/grub
+    echo "GRUB_DISABLE_OS_PROBER=false" >> /mnt/etc/default/grub
+
+    if [ "$LUKS_PASSWORD" != "" ]; then
+        echo "GRUB_ENABLE_CRYPTODISK=y" >> /mnt/etc/default/grub
+        ##LUKS KEYFILE Good for encrypting many partitions without having to type password to each one separately...
+        arch-chroot /mnt mkdir /root/.luks2_keys && arch-chroot /mnt chmod 700 /root/.luks2_keys
+        head -c 64 /dev/urandom >> /mnt/root/.luks2_keys/crypto_keyfile.bin
+        arch-chroot /mnt chmod 600 /root/.luks2_keys/crypto_keyfile.bin
+        arch-chroot /mnt cryptsetup -v luksAddKey -i 1 $PARTITION_ROOT /root/.luks2_keys/crypto_keyfile.bin
+        arch-chroot /mnt sed -i 's|'FILES=\(\)'|FILES=\(/root/.luks2_keys/crypto_keyfile.bin\)|g' /etc/mkinitcpio.conf
+        arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'" 'cryptkey=rootfs:/root/.luks2_keys/crypto_keyfile.bin'|' /etc/default/grub
+        mkinitcpio
+    fi
+    if [ "$LUKS_PASSWORD" == "" ]; then
+        arch-chroot /mnt sed -i 's/GRUB_CMDLINE_LINUX=""/GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"/' /etc/default/grub
+    fi
 
     if [ "$BIOS_TYPE" == "uefi" ]; then
-        pacman_install "efibootmgr"
-        arch-chroot /mnt grub-install --target=x86_64-efi --bootloader-id=grub --efi-directory=$ESP_DIRECTORY --recheck
-        #arch-chroot /mnt efibootmgr --create --disk $DEVICE --part $PARTITION_BOOT_NUMBER --loader /EFI/grub/grubx64.efi --label "GRUB Boot Manager"
+        arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=$ESP_DIRECTORY --bootloader-id=GRUB --recheck
     fi
     if [ "$BIOS_TYPE" == "bios" ]; then
         arch-chroot /mnt grub-install --target=i386-pc --recheck $DEVICE
@@ -1276,9 +1305,6 @@ function bootloader_grub() {
 
     arch-chroot /mnt grub-mkconfig -o "$BOOT_DIRECTORY/grub/grub.cfg"
 
-    if [ "$VIRTUALBOX" == "true" ]; then
-        echo -n "\EFI\grub\grubx64.efi" > "/mnt$ESP_DIRECTORY/startup.nsh"
-    fi
 }
 
 function bootloader_refind() {
@@ -1934,4 +1960,3 @@ function main() {
 }
 
 main $@
-
