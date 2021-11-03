@@ -565,8 +565,7 @@ function partition() {
     if [ -n "$LUKS_PASSWORD" ]; then
         echo -n "$LUKS_PASSWORD" | cryptsetup --key-size=512 luksFormat --type luks2 --pbkdf argon2id -i 5000 $PARTITION_ROOT
         echo -n "$LUKS_PASSWORD" | cryptsetup open $PARTITION_ROOT $LUKS_DEVICE_NAME
-        sleep 13
-        # TODO: keyfile generation to avoid having to enter the encryption passphrase twice (once for GRUB and once more for initramfs.)
+        sleep 10
     fi
 
     if [ "$LVM" == "true" ]; then
@@ -1270,7 +1269,12 @@ function bootloader() {
 
 function bootloader_grub() {
     
-    pacman_install "grub efibootmgr dosfstools os-prober"
+    if [ "$BIOS_TYPE" == "uefi" ]; then
+        pacman_install "grub efibootmgr dosfstools os-prober"
+    fi
+    if [ "$BIOS_TYPE" == "bios" ]; then
+         pacman_install "grub dosfstools os-prober"
+    fi
     
     arch-chroot /mnt sed -i 's/GRUB_DEFAULT=0/GRUB_DEFAULT=saved/' /etc/default/grub
     arch-chroot /mnt sed -i 's/#GRUB_SAVEDEFAULT="true"/GRUB_SAVEDEFAULT="true"/' /etc/default/grub
@@ -1284,12 +1288,13 @@ function bootloader_grub() {
     if [ "$LUKS_PASSWORD" != "" ]; then
         echo "GRUB_ENABLE_CRYPTODISK=y" >> /mnt/etc/default/grub
         ##LUKS KEYFILE Good for encrypting many partitions without having to type password to each one separately...
+        CMDLINE_LINUX="$CMDLINE_LINUX cryptkey=rootfs:/root/.luks2_keys/crypto_keyfile.bin"
         arch-chroot /mnt mkdir /root/.luks2_keys && arch-chroot /mnt chmod 700 /root/.luks2_keys
         head -c 64 /dev/urandom >> /mnt/root/.luks2_keys/crypto_keyfile.bin
         arch-chroot /mnt chmod 600 /root/.luks2_keys/crypto_keyfile.bin
         arch-chroot /mnt cryptsetup -v luksAddKey -i 1 $PARTITION_ROOT /root/.luks2_keys/crypto_keyfile.bin
         arch-chroot /mnt sed -i 's|'FILES=\(\)'|FILES=\(/root/.luks2_keys/crypto_keyfile.bin\)|g' /etc/mkinitcpio.conf
-        arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'" 'cryptkey=rootfs:/root/.luks2_keys/crypto_keyfile.bin'|' /etc/default/grub
+        arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"|' /etc/default/grub
         mkinitcpio
     fi
     if [ "$LUKS_PASSWORD" == "" ]; then
