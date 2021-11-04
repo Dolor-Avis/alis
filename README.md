@@ -7,8 +7,6 @@ Arch Linux Install Script (or alis) installs unattended, automated and customize
 
 It is a simple bash script that fully automates the installation of a Arch Linux system after booting from the original Arch Linux installation media. It contains the same commands that you would type and execute one by one interactively to complete the installation. The only user intervention needed is to edit a configuration file to choose the installation options and preferences from partitioning, to encryption, bootloader, file system, language and keyboard mapping, desktop environment, kernels, packages to install and graphic drivers. This automation makes the installation easy and fast, fast as less than 4 minutes.
 
-If some time later after an system update for any reason the system does not boot correctly a recovery script is also provided to enter in a recovery mode that allows to downgrade packages or execute any other commands to restore the system. Also a log of the installation can be taken with <a href="https://asciinema.org/">asciinema</a>.
-
 **Warning! This script can delete all partitions of the persistent storage. It is recommended to test it first in a virtual machine like <a href="https://www.virtualbox.org/">VirtualBox</a>.**
 
 Currently these scripts are for me but maybe they are useful for you too.
@@ -74,7 +72,6 @@ For new features, improvements and bugs fill an issue in GitHub or make a pull r
 * Script for download installation and **recovery scripts** and configuration files
 * **Retry packages download** on connection/mirror error
 * **Packer support** for testing in VirtualBox
-* **Installation log** with all commands executed and output in a file and/or **asciinema video**
 * Wait after installation for an **abortable reboot**
 * **Use your own configuration**
 
@@ -104,7 +101,6 @@ Advanced usage
 # iwctl --passphrase "[WIFI_KEY]" station [WIFI_INTERFACE] connect "[WIFI_ESSID]"          # (Optional) Connect to WIFI network. _ip link show_ to know WIFI_INTERFACE.
 # curl -sL https://raw.githubusercontent.com/picodotdev/alis/master/download.sh | bash     # Download alis scripts
 # # curl -sL https://bit.ly/2F3CATp | bash                                                 # Alternative download URL with URL shortener
-# ./alis-asciinema.sh     # (Optional) Start asciinema video recording
 # vim alis.conf           # Edit configuration and change variables values with your preferences (system configuration)
 # vim alis-packages.conf  # (Optional) Edit configuration and change variables values with your preferences (packages to install)
 #                         # (The preferred way to install packages is after system installation, see Packages installation)
@@ -120,7 +116,6 @@ After the base Arch Linux system is installed, alis can install packages with pa
 #                                  # After system installation start a user session
 # curl -sL https://raw.githubusercontent.com/picodotdev/alis/master/download.sh | bash     # Download alis scripts
 # # curl -sL https://bit.ly/2F3CATp | bash                                                 # Alternative download URL with URL shortener
-# ./alis-packages-asciinema.sh     # (Optional) Start asciinema video recording
 # vim alis-packages.conf           # Edit configuration and change variables values with your preferences (packages to install)
 # ./alis-packages.sh               # Start packages installation
 ```
@@ -135,7 +130,6 @@ Boot from the latest <a href="https://www.archlinux.org/download/">original Arch
 # iwctl --passphrase "[WIFI_KEY]" station [WIFI_INTERFACE] connect "[WIFI_ESSID]"          # (Optional) Connect to WIFI network. _ip link show_ to know WIFI_INTERFACE.
 # curl -sL https://raw.githubusercontent.com/picodotdev/alis/master/download.sh | bash     # Download alis scripts
 # # curl -sL https://bit.ly/2F3CATp | bash                                                 # Alternative download URL with URL shortener
-# ./alis-recovery-asciinema.sh     # (Optional) Start asciinema video recording
 # vim alis-recovery.conf           # Edit configuration and change variables values with your last installation configuration with alis (mainly device and partition scheme)
 # ./alis-recovery.sh               # Start recovery
 # ./alis-recovery-reboot.sh        # Reboot the system
@@ -144,8 +138,6 @@ Boot from the latest <a href="https://www.archlinux.org/download/">original Arch
 ### Video
 
 Arch Linux base installation installed in **less than 4 minutes** with a fiber internet connection. Don't trust me? See the video.
-
-[![asciicast](https://asciinema.org/a/444025.png)](https://asciinema.org/a/444025)
 
 ### How you can help
 
