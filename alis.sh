@@ -41,7 +41,6 @@ set -e
 # # ./alis.sh
 
 # global variables (no configuration, don't edit)
-ASCIINEMA=""
 BIOS_TYPE=""
 PARTITION_BOOT=""
 PARTITION_ROOT=""
@@ -71,7 +70,6 @@ CMDLINE_LINUX=""
 CONF_FILE="alis.conf"
 GLOBALS_FILE="alis-globals.conf"
 LOG_FILE="alis.log"
-ASCIINEMA_FILE="alis.asciinema"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -275,12 +273,6 @@ function facts() {
         BIOS_TYPE="uefi"
     else
         BIOS_TYPE="bios"
-    fi
-
-    if [ -f "$ASCIINEMA_FILE" ]; then
-        ASCIINEMA="true"
-    else
-        ASCIINEMA="false"
     fi
 
     DEVICE_SATA="false"
@@ -1293,7 +1285,6 @@ function bootloader_grub() {
         head -c 64 /dev/urandom >> /mnt/root/.luks2_keys/crypto_keyfile.bin
         arch-chroot /mnt chmod 600 /root/.luks2_keys/crypto_keyfile.bin
         arch-chroot /mnt cryptsetup -v luksAddKey -i 1 $PARTITION_ROOT /root/.luks2_keys/crypto_keyfile.bin
-        arch-chroot /mnt sed -i 's|'FILES=\(\)'|FILES=\(/root/.luks2_keys/crypto_keyfile.bin\)|g' /etc/mkinitcpio.conf
         arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"|' /etc/default/grub
         mkinitcpio
     fi
@@ -1742,22 +1733,13 @@ function end() {
             copy_logs
             do_reboot
         else
-            if [ "$ASCIINEMA" == "true" ]; then
-                echo "Reboot aborted. You will must terminate asciinema recording and do a explicit reboot (exit, ./alis-reboot.sh)."
-                echo ""
-            else
-                echo "Reboot aborted. You will must do a explicit reboot (./alis-reboot.sh)."
-                echo ""
-            fi
+            echo "Reboot aborted. You will must do a explicit reboot (./alis-reboot.sh)."
+            echo ""
         fi
     else
-        if [ "$ASCIINEMA" == "true" ]; then
-            echo "No reboot. You will must terminate asciinema recording and do a explicit reboot (exit, ./alis-reboot.sh)."
-            echo ""
-        else
-            echo "No reboot. You will must do a explicit reboot (./alis-reboot.sh)."
-            echo ""
-        fi
+       
+        echo "No reboot. You will must do a explicit reboot (./alis-reboot.sh)."
+        echo ""
     fi
 }
 
@@ -1822,24 +1804,6 @@ function copy_logs() {
             sed -i "s/${ESCAPED_USER_PASSWORD}/******/g" "$FILE"
         fi
     fi
-    if [ -f "$ASCIINEMA_FILE" ]; then
-        SOURCE_FILE="$ASCIINEMA_FILE"
-        FILE="/mnt/var/log/alis/$ASCIINEMA_FILE"
-
-        mkdir -p /mnt/var/log/alis
-        cp "$SOURCE_FILE" "$FILE"
-        chown root:root "$FILE"
-        chmod 600 "$FILE"
-        if [ -n "$ESCAPED_LUKS_PASSWORD" ]; then
-            sed -i "s/${ESCAPED_LUKS_PASSWORD}/******/g" "$FILE"
-        fi
-        if [ -n "$ESCAPED_ROOT_PASSWORD" ]; then
-            sed -i "s/${ESCAPED_ROOT_PASSWORD}/******/g" "$FILE"
-        fi
-        if [ -n "$ESCAPED_USER_PASSWORD" ]; then
-            sed -i "s/${ESCAPED_USER_PASSWORD}/******/g" "$FILE"
-        fi
-    fi
 }
 
 function do_reboot() {
@@ -1874,7 +1838,6 @@ function load_globals() {
 
 function save_globals() {
     cat <<EOT > $GLOBALS_FILE
-ASCIINEMA="$ASCIINEMA"
 BIOS_TYPE="$BIOS_TYPE"
 PARTITION_BOOT="$PARTITION_BOOT"
 PARTITION_ROOT="$PARTITION_ROOT"

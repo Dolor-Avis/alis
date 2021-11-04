@@ -45,7 +45,6 @@ set -e
 # # ./alis-recovery.sh
 
 # global variables (no configuration, don't edit)
-ASCIINEMA=""
 BIOS_TYPE=""
 PARTITION_BOOT=""
 PARTITION_ROOT=""
