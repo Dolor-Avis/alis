@@ -1068,11 +1068,7 @@ function network() {
 function virtualbox() {
     print_step "virtualbox()"
 
-    if [ -z "$KERNELS" ]; then
-        pacman_install "virtualbox-guest-utils"
-    else
-        pacman_install "virtualbox-guest-utils virtualbox-guest-dkms"
-    fi
+    pacman_install "virtualbox-guest-utils"
     arch-chroot /mnt systemctl enable vboxservice.service
 }
 
