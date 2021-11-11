@@ -555,7 +555,7 @@ function partition() {
 
     # luks and lvm
     if [ -n "$LUKS_PASSWORD" ]; then
-        echo -n "$LUKS_PASSWORD" | cryptsetup --key-size=512 luksFormat --type luks2 --pbkdf argon2id -i 5000 $PARTITION_ROOT
+        echo -n "$LUKS_PASSWORD" | cryptsetup --key-size=512 luksFormat --align-payload=8192 --type luks2 --pbkdf argon2id -i 5000 $PARTITION_ROOT
         echo -n "$LUKS_PASSWORD" | cryptsetup open $PARTITION_ROOT $LUKS_DEVICE_NAME
         sleep 10
     fi
@@ -1275,13 +1275,14 @@ function bootloader_grub() {
 
     if [ "$LUKS_PASSWORD" != "" ]; then
         echo "GRUB_ENABLE_CRYPTODISK=y" >> /mnt/etc/default/grub
-        ##LUKS KEYFILE Good for encrypting many partitions without having to type password to each one separately...
-        CMDLINE_LINUX="$CMDLINE_LINUX cryptkey=rootfs:/root/.luks2_keys/crypto_keyfile.bin"
-        arch-chroot /mnt mkdir /root/.luks2_keys && arch-chroot /mnt chmod 700 /root/.luks2_keys
-        head -c 64 /dev/urandom >> /mnt/root/.luks2_keys/crypto_keyfile.bin
-        arch-chroot /mnt chmod 600 /root/.luks2_keys/crypto_keyfile.bin
-        arch-chroot /mnt cryptsetup -v luksAddKey -i 1 $PARTITION_ROOT /root/.luks2_keys/crypto_keyfile.bin
-        arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"|' /etc/default/grub
+        # //WIP Disabled for now
+        # LUKS KEYFILE Good for encrypting many partitions without having to type password for each one separately...
+        # CMDLINE_LINUX="$CMDLINE_LINUX cryptkey=rootfs:/root/.luks2_keys/crypto_keyfile.bin"
+        # arch-chroot /mnt mkdir /root/.luks2_keys && arch-chroot /mnt chmod 700 /root/.luks2_keys
+        # head -c 64 /dev/urandom >> /mnt/root/.luks2_keys/crypto_keyfile.bin
+        # arch-chroot /mnt chmod 600 /root/.luks2_keys/crypto_keyfile.bin
+        # arch-chroot /mnt cryptsetup -v luksAddKey -i 1 $PARTITION_ROOT /root/.luks2_keys/crypto_keyfile.bin
+        # arch-chroot /mnt sed -i 's|'GRUB_CMDLINE_LINUX=""'|GRUB_CMDLINE_LINUX="'"$CMDLINE_LINUX"'"|' /etc/default/grub
         mkinitcpio
     fi
     if [ "$LUKS_PASSWORD" == "" ]; then
@@ -1289,14 +1290,13 @@ function bootloader_grub() {
     fi
 
     if [ "$BIOS_TYPE" == "uefi" ]; then
-        arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=$ESP_DIRECTORY --bootloader-id=GRUB --recheck
+        arch-chroot /mnt grub-install --target=x86_64-efi --efi-directory=$ESP_DIRECTORY --bootloader-id=Arch_Linux --recheck
     fi
     if [ "$BIOS_TYPE" == "bios" ]; then
         arch-chroot /mnt grub-install --target=i386-pc --recheck $DEVICE
     fi
 
     arch-chroot /mnt grub-mkconfig -o "$BOOT_DIRECTORY/grub/grub.cfg"
-
 }
 
 function bootloader_refind() {
